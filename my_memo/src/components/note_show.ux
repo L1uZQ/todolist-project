@@ -1,0 +1,125 @@
+<import name="note" src="../components/note.ux"></import>
+
+<template>
+  <stack>
+      <!-- 空白页提示语 -->
+    <div class="all no-result" if="{{noteList.length === 0}}">
+      <image src="../assets/images/no-result.png"></image>
+      <text>现在还什么都没有</text>
+      <text>快去添加一条笔记吧</text>
+    </div>
+
+    <div class="main-page">
+      <div class="title-area">
+        <text class="title-text">所有笔记</text>
+      </div>
+      <div class="notelist">
+        <block for="noteList">
+          <note note="{{$item}}" index="{{$idx}}" ondelete="delete"></note>
+        </block>        
+      </div>
+    </div>
+
+    <div class="add-btn" onclick="add">
+      <image src="../assets/images/add.png"></image>
+    </div>
+  </stack>
+</template>
+
+<script>
+import { getNoteList, setNoteList } from '../storage/data.js'
+import router from '@system.router'
+
+export default {
+  data() {
+    return {
+      noteList: []
+    }
+  },
+
+  onInit() {
+    this.$on('showPage', this.refreshList)
+    // const notelist= (await getNoteList())
+    // setNoteList(this.noteList) 
+  },
+
+  add() {
+    router.push({
+      uri: 'pages/add/add_note'
+    })
+  },
+
+  async refreshList() {
+    this.noteList = (await getNoteList()) || []
+  },
+
+  delete(e) {
+    this.noteList.splice(e.detail.index, 1)
+    setNoteList(this.noteList)
+  }
+}
+</script>
+
+<style lang="less">
+@import '../assets/styles/style.less';
+
+.content-wrap {
+  padding-bottom: 52px;
+}
+
+.no-result {
+  .flex-box-mixins(column, flex-start, center);
+  image {
+    width: 80px;
+    height: 80px;
+    margin-top: 200px;
+    margin-bottom: 15px;
+  }
+  text {
+    font-size: 13px;
+    color: #e2e2e2;
+  }
+}
+
+/* 添加按钮样式 */
+.add-btn {
+  .flex-box-mixins;
+  width: 50px;
+  height: 50px;
+  border-radius: 30px;
+  background-color: @brand;
+  position:absolute;
+  bottom: 80px;
+  right: 25px;
+  image {
+    width: 20px;
+    height: 20px;
+  }
+}
+
+
+.main-page {
+  background-color: rgb(238, 235, 235);
+  flex-direction: column;
+  margin-bottom: 50px;
+  width:360px;
+  .title-area{
+    position: absolute;
+    height:40px;
+    width:360px;
+    margin-bottom: 5px;
+    background-color: #9dd7ef;
+    .title-text{
+      width:100%;
+      text-align: center;
+      font-size: 22;
+      font-family:  fantasy;
+    }
+  }
+  .notelist{
+       flex-direction: column;
+      height:100%;
+      margin-top: 50px;
+  }
+}
+</style>

@@ -1,0 +1,454 @@
+<import name="menu-bar" src="../../../components/menubar.ux"></import>
+<template>
+  <div class="add-page">
+    <div class="page-title">
+        <text class="title-text">添加和修改待办</text>
+    </div>
+    <div class='event-input'>
+      <input
+        class="input-text"
+        type="text"
+        placeholder="请输入待办事项"
+        value="{{title}}"
+        maxlength="50"
+        onchange="getTitle"
+      />
+      <!-- 删除按钮和语音按钮 -->
+      <div class='clear-btn' onclick='clearinput'></div>
+      <div class='asr-image1' onclick='startAsr'></div>
+    </div>
+
+    <!-- 待办事件的重要程度 -->
+    <div class="label-wrap">
+      <text class="label-title">重要程度:</text>
+      <text
+        class="{{label === '普通'?'common':''}}"
+        onclick="changeLabel('普通')"
+        >普通</text
+      >
+      <text
+        class="{{label === '一般'?'middle':''}}"
+        onclick="changeLabel('一般')"
+        >一般</text
+      >
+      <text
+        class="{{label === '重要'?'important':''}}"
+        onclick="changeLabel('重要')"
+        >重要</text
+      >
+    </div>
+
+    <!-- 输入开始时间 -->
+    <div class='time-area'>
+      <text>开始时间:</text>
+      <div class='time-input'>
+        <text class="data-text">日期:</text>
+        <picker class='date-picker' type="date" value="{{start_date}}" onchange="getStartDate"></picker>
+        <text class="data-text">时间:</text>
+        <picker class='time-picker' type="time" value="{{start_time}}" onchange="getStartTime"></picker>
+      </div>
+    </div>
+    <!-- 输入结束时间 -->
+    <div class='time-area'>
+      <text>结束时间:</text>
+      <div class='time-input'>
+        <text class="data-text">日期:</text>
+        <picker class='date-picker' type="date" value="{{end_date}}" onchange="getEndDate"></picker>
+        <text class="data-text">时间:</text>
+        <picker class='time-picker' type="time" value="{{end_time}}" onchange="getEndTime"></picker>
+      </div>
+    </div>
+
+    <div class="add-btn">
+      <text onclick="addTodo" style="opacity: {{canAdd ? '1' : '0.4'}};"
+        >完成</text
+      >
+    </div>
+  </div>
+</template>
+
+<script>
+import { getTodoList, setTodoList } from '../../../storage/data.js'
+import router from '@system.router'
+import asr from '@service.asr'
+import storage from '@system.storage'
+import vibrator from '@system.vibrator'
+import prompt from '@system.prompt'
+
+export default {
+  data() {
+    return {
+      nameBackUp: '',
+      start_date: '',
+      start_time: '',
+      end_date: '',
+      end_time: '',
+      checked: false,
+      enabled: false,
+      scale: '',
+      index: '',
+      title: '',
+      start: '',
+      end: '',
+      label: '普通',
+      type: 0,
+    }
+  },
+  
+
+  computed: {
+    canAdd() {
+      if (this.title) {
+        return true
+      } else {
+        return false
+      }
+    }
+  },
+  getTitle(e) {
+    this.title = e.value
+  },
+
+  changeLabel(label) {
+    this.label = label
+  },
+
+  onInit() {
+    // this.$page.setTitleBar({ text: 'add todos' })
+    this.initAsr()
+    const date = new Date()
+    const Y = date.getFullYear()
+    const M = date.getMonth() + 1
+    const D = date.getDate()
+    const H = date.getHours()
+    const m = date.getMinutes()
+    this.start_date = Y + '-' + M + '-' + D
+    // 可能有问题
+    if(m<10){
+      this.start_time = H + ':'+'0' + m
+    }
+    else{
+        this.start_time = H + ':' + m
+    }
+    date.setTime(date.getTime() + 24 * 60 * 60 * 1000)
+    const TY = date.getFullYear()
+    const TM = date.getMonth() + 1
+    const TD = date.getDate()
+    const TH = date.getHours()
+    const Tm = date.getMinutes()
+    this.end_date = TY + '-' + TM + '-' + TD
+    if(Tm<10){
+      this.end_time = TH + ':'+'0' + Tm
+    }else{
+      this.end_time = TH + ':' + Tm
+    }
+  },
+
+  initAsr() {
+    let that = this
+    asr.oncompleteresult = ({ result }) => {
+      this.title = this.nameBackUp + `${result}`
+    }
+  },
+  startAsr() {
+    let that = this
+    this.nameBackUp = this.title
+    // 调用kaldi语音接口
+    asr.start({
+      success: function () {
+        vibrator.vibrate({ mode: 'short' })
+        vibrator.vibrate({ mode: 'short' })
+      },
+      fail: function (data, code) {
+        that.tltle = `start fail, code=${code}, data=${data}`
+      }
+    })
+  },
+  clearinput() {
+    this.title= ''
+  },
+
+  //以下为picker组件的函数
+  getStartDate(e) {
+    this.start_date = e.year + '-' + (e.month + 1) + '-' + e.day
+  },
+  getStartTime(e) {
+    if(e.minute<10){
+      this.start_time = e.hour + ':'+0+ e.minute
+    }else{
+      this.start_time = e.hour + ':' + e.minute
+    }
+  },
+  getEndDate(e) {
+    this.end_date = e.year + '-' + (e.month + 1) + '-' + e.day
+  },
+  getEndTime(e) {
+    if(e.minute<10){
+      this.end_time = e.hour + ':'+0+ e.minute
+    }else{
+      this.end_time = e.hour + ':' + e.minute
+    }
+  },
+  
+  //显示语音输入按钮
+  enableAsrBtn() {
+    this.enabled = !this.enabled
+  },
+//加进来的代码
+
+ async addTodo() {
+    // 得到开始时间和结束时间
+    let type=0;
+    let start = this.start_date + ' ' + this.start_time
+    let end =  this.end_date + ' ' + this.end_time
+
+    // 根据用户输入的时间对待办事项的状态进行分类
+    let now_num= (new Date()).getTime();
+    let arr1 = start.replace(/[:\-\\&' ']/g, ',').split(',');
+    let arr2 = end.replace(/[:\-\\&' ']/g, ',').split(',');
+    let start_num = new Date(arr1[0], arr1[1] - 1, arr1[2], arr1[3], arr1[4], 0, 0);
+    let end_num=new Date(arr2[0], arr2[1] - 1, arr2[2], arr2[3], arr2[4], 0, 0);
+      if(start_num.getTime()>now_num){
+        type=1;//todo
+      }
+      if(now_num>=start_num.getTime()&&now_num<=end_num.getTime()){
+        type=2;//doing 
+      }
+      if(now_num>end_num.getTime()){//当前时间已经晚于给出的结束时间，应该重新输入
+          prompt.showToast({
+              message:'输入时间有误，请重新输入',
+              duration:"100000",
+              // image:"/Common/logo.png",
+              gravity: 'center'
+          })
+          router.push({
+            uri: 'pages/add/add_todo',
+            params: {
+                title: this.todo.title,
+                index: this.index
+              }
+          })
+      }
+      if (this.title) {
+      const todo = {
+        title: this.title,
+        label: this.label,
+        start: start,
+        end: end,
+        type:type,
+        // index:this.index,
+        // 1:to do   2 doing   3 done 
+      }
+      const todoList = await getTodoList()
+      if (this.index !== '') {
+        todoList[this.index] = todo
+      } else {
+        todoList.push(todo)
+      }
+      setTodoList(todoList)
+      router.push({
+        uri: 'pages/main',
+      })
+    }
+  },
+}
+</script>
+
+<style lang="less">
+@import '../../../assets/styles/style.less';
+
+
+/* 添加框样式 */
+.add-page {
+  .flex-box-mixins(column, flex-start, flex-start);
+  /* 输入框 */
+  .page-title{
+      height:40px;
+      width:360px;
+      background-color: #9dd7ef;
+    .title-text{
+      width:360px;
+      text-align: center;
+      font-size: 22px;
+      font-family: fantasy;
+      font-weight: bold;
+      color: #000000;
+    }
+  }
+  .event-input {
+    height: 45px;
+    width:300px;
+    margin-left: 30px;
+    margin-top: 20px;
+    border-radius: 15px;
+    background-color: #ffffff;
+    border: 1.5px solid rgb(221, 224, 233);
+    flex-direction: row;
+    > input {
+      flex-grow: 1;
+      padding: 10px 30px;
+    }
+    .input-text {
+      .border-bottom;
+      .title-text;
+      width: 100%;
+      /* height: 50px; */
+      placeholder-color: @placeholder-color;
+      padding: 5px 15px;
+      caret-color: @brand;
+    }
+    .clear-btn {
+      width: 25px;
+      height: 25px;
+      /* margin-top--margin-right--margin-bottom--margin-left */
+      margin: 10px 0px 10px 0px;
+      margin-right: 5px;
+      border-width: 0px;
+      flex-shrink: 0;
+      background-image: url("../../../assets/images/cancle.png");
+    }
+    .asr-image1 {
+      width: 25px;
+      height: 25px;
+      /* margin-top--margin-right--margin-bottom--margin-left */
+      margin: 10px 0px 10px 0px;
+      margin-right: 5px;
+      border-width: 0px;
+      flex-shrink: 0;
+      background-image: url("../../../assets/images/asr.png");
+    }   
+  }
+}
+
+
+/* 重要程度标签 */
+.label-wrap {
+  padding: 10px;
+  text {
+    .label-text;
+    padding: 5px 15px;
+    border-width: @border-size;
+    border-style: @border-style;
+    border-color: @label-color;
+    margin-right: 20px;
+    border-radius: 15px;
+  }
+  .label-title{
+    border: 0px;
+    margin-right: 5px;
+    font-family: serif;
+    font-size: 15px;
+    color: #000000;
+  }
+  .common {
+    color: @label-select-color;
+    background-color: @gray;
+    border-color: @gray;
+  }
+  .middle {
+    color: @label-select-color;
+    background-color: @santas-gray;
+    border-color: @santas-gray;
+  }
+  .important {
+    color: @label-select-color;
+    background-color: @dark-red;
+    border-color: @dark-red;
+  }
+}
+
+
+
+.add-btn {
+  .border-top;
+  position: absolute;
+  bottom: 0px;
+  width: 100%;
+  height: 70px;
+  padding: 15px 20px;
+  text {
+    width: 320px;
+    height: 40px;
+    background-color: @brand;
+    border-radius: 20px;
+    font-size: 16px;
+    color: #ffffff;
+    text-align: center;
+    line-height: 18px;
+    font-weight: bold;
+  }
+}
+
+
+
+/* .content {
+  .border-bottom;
+  .content-text;
+  width: 100%;
+  height: 150px;
+  placeholder-color: @placeholder-color;
+  padding: 5px 15px;
+  caret-color: @brand;
+} */
+
+
+/* 时间选择样式 */
+.time-area {
+  flex-direction: row;
+  background-color: #faebd7;
+  .time-input {
+    background-color: #fff8dc;
+    flex-direction: row;
+    height: 40px;
+    width: 220px;
+    border-radius: 10px;
+    margin-top: 10px;
+    margin-left: 5px;
+    margin-right: 5px;
+    margin-bottom: 10px;
+    background-color: #ffffff;
+    border: 3px solid rgb(238, 240, 245);
+    .data-text{
+      text-align: center;
+      width:25px;
+      font-size: 10px;
+      margin-left: 5px;
+      margin-right: 0px;
+      font-family: serif;
+    }
+    .date-picker {
+      text-align: center;
+      background-color: #9dd7ef;
+      width: 70px;
+      height: 30px;
+      /* margin: 0 auto; */
+      margin-top: 2px;
+      margin-left: 5px;
+      margin-right: 10px;
+      flex: 0;
+      font-family: myfont, serif;
+      font-size: 10px;
+      border-radius: 10px;
+    }
+    .time-picker {
+      text-align: center;
+      background-color: #9dd7ef;
+      width: 40px;
+      height: 30px;
+      margin-top: 2px;
+      margin-left: 5px;
+      flex: 0;
+      font-family: myfont, serif;
+      font-size: 10px;
+      border-radius: 10px;
+    }
+  }
+  > text {
+    width: 120px;
+    font-size: 18px;
+    text-align: center;
+    font-family: myfont, serif;
+  }
+}
+
+</style>

@@ -1,0 +1,33 @@
+<import name="tabbar" src="../../components/tabbar.ux"></import>
+<import name="todo_show" src="../../components/todo_show.ux"></import>
+<import name="note_show" src="../../components/note_show.ux"></import>
+<import name="more" src="../../components/more.ux"></import>
+<template>
+  <div>
+    <todo_show show="{{current === 'todo_show'}}"></todo_show>
+    <note_show show="{{current === 'note_show'}}"></note_show>
+    <more show="{{current === 'more'}}"></more>
+    <tabbar ontap="handleTap"></tabbar>
+  </div>
+</template>
+
+<script>
+export default {
+  data: {
+    current: 'todo_show'
+  },
+
+  onShow() {
+    this.$broadcast('showPage')
+  },
+
+  handleTap(e) {
+    if (this.current !== 'todo_show' && e.detail.current === 'todo_show') {
+      this.$broadcast('showPage')
+    }
+    this.current = e.detail.current
+  }
+}
+</script>
+
+<style></style>

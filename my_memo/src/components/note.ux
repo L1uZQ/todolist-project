@@ -1,0 +1,216 @@
+<template>
+  <stack>
+    <!-- 向左滑删除 -->
+    <div class="delete-wrap" onclick="delete">
+      <image src="../assets/images/delete.png"></image>
+    </div>
+    <div
+      class="note-item"
+      style="right: {{right}}px;"
+      onclick="turnToEdit()"
+      ontouchstart="touchstart"
+      ontouchmove="touchmove"
+      ontouchend="touchend"
+      ontouchcancel="touchcancel"
+    >
+      <div class="title-wrap">
+        <text class="title">{{ note.title }}</text>
+        <text class="label" style="{{note.label | calLabelColor}}">{{
+          note.label
+        }}</text>
+      </div>
+      <div class="content-wrap">
+        <text class="content">{{ note.content }}</text>
+      </div>
+      <div class="time-wrap">
+        <text class="time">{{ note.timestamp | calTime }}</text>
+      </div>
+    </div>
+  </stack>
+</template>
+
+<script>
+import router from '@system.router'
+import prompt from '@system.prompt'
+
+export default {
+  data() {
+    return {
+      startPos: '',
+      right: 0,
+      canMove: true
+    }
+  },
+
+  touchstart(e) {
+    console.log('start', e)
+    if (this.right !== 0) {
+      this.right = 0
+      this.canMove = false
+    } else {
+      this.startPos = e.touches[0].clientX
+      this.canMove = true
+    }
+  },
+
+  touchmove(e) {
+    console.log('move', e)
+    if (this.startPos > e.touches[0].clientX && this.canMove) {
+      //左滑
+      const right = this.startPos - e.touches[0].clientX
+      this.right = right
+    }
+  },
+
+  touchend(e) {
+    console.log('end', e)
+    if (this.right >= 40) {
+      this.right = 60
+    } else {
+      this.right = 0
+    }
+  },
+
+  touchcancel(e) {
+    console.log('cancel', e)
+  },
+
+  props: {
+    note: {
+      default: {}
+    },
+    index: ''
+  },
+
+  calTime(time) {
+    const date = new Date(time)
+    const year = date.getFullYear()
+    const month = date.getMonth() + 1
+    const day = date.getDate()
+    return `${year}/${month}/${day}`
+  },
+
+  turnToEdit() {
+    router.push({
+      uri: 'pages/add/add_note',
+      params: {
+        title: this.note.title,
+        content: this.note.content,
+        index: this.index
+      }
+    })
+  },
+
+  delete() {
+    prompt.showDialog({
+      title: '提示',
+      message: '是否删除这条记录',
+      buttons: [
+        {
+          text: '确定',
+          color: '#ff2828'
+        },
+        {
+          text: '取消',
+          color: '#000000'
+        }
+      ],
+      success: data => {
+        console.log('handling callback', data)
+        if (data.index === 0) {
+          this.right = 0
+          this.$emit('delete', { index: this.index })
+          prompt.showToast({
+            message: '删除成功'
+          })
+        }
+      },
+      cancel: function() {
+        console.log('handling cancel')
+      },
+      fail: function(data, code) {
+        console.log(`handling fail, code = ${code}`)
+      }
+    })
+  },
+
+  calLabelColor(label) {
+    if (!label || label === '普通') {
+      return 'color: rgb(127,137,115);' //青绿色
+    } else if (label === '一般') {
+      return 'color: rgb(161,165,183);' //灰色
+    } else {
+      return 'color: rgb(143,85,88);'   //红褐色
+    }
+  }
+}
+</script>
+
+<style lang="less">
+@import '../assets/styles/style.less';
+
+.delete-wrap {
+  .flex-box-mixins(row, flex-end, center);
+  width: 100%;
+  padding-right: 20px;
+  background-color: #eeeeee;
+  image {
+    width: 30px;
+    height: 30px;
+  }
+}
+
+.note-item {
+  .column;
+  width:94%;
+  margin-left: 10px;
+  /* position: relative; */
+  padding: 5px 10px;
+  /* margin-top: 45px; */
+  margin-bottom: 5px;
+  border-bottom: 1px solid #eeeeee;
+  background-color: @bg-color;
+  border: 1px solid rgb(238, 240, 245);
+  border-radius: 25px;  
+  .label {
+    .label-text;
+    width:40px;
+    font-size: 13px;
+  }
+  .title {
+    width: 300px;
+    .title-text;
+    lines: 1;
+    margin-left: 5px;
+    margin-top: 10px;
+    font-weight: bold;
+    font-size: 20px;
+    font-family: serif;
+    text-overflow: ellipsis;
+    &-wrap {
+      justify-content: space-between;
+    }
+  }
+  .content {
+    width: 90%;
+    margin-left: 5px;
+    .content-text;
+    lines: 2;
+    text-overflow: ellipsis;
+    font-size: 16px;
+    font-family: serif;
+    color: #000000;
+    &-wrap {
+      margin-top: 2px;
+    }
+  }
+  .time {
+    font-size: 13px;
+    color: #cfcfcf;
+    line-height: 15px;
+    &-wrap {
+      justify-content: flex-end;
+    }
+  }
+}
+</style>

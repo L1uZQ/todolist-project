@@ -1,0 +1,329 @@
+<import name="todo" src="../components/todo.ux"></import>
+<template>
+  <div>
+    <stack>
+    <div class="all no-result" if="{{this.todoList.length === 0}}">
+      <image src="../assets/images/no-result.png"></image>
+      <text>现在还什么都没有</text>
+      <text>快去添加一条记录吧</text>
+    </div>
+    <div class="main-page">
+      <div class="title-area">
+        <text class="title-text">所有待办事项</text>
+      </div>
+      <tabs class="tabs" onchange="changeTabactive">
+        <tab-bar class="tab-bar">
+          <text class="tab-text">TODO</text>
+          <text class="tab-text">DOING</text>
+          <text class="tab-text">DONE</text>
+          <text class="tab-text">超时</text>
+        </tab-bar>
+        
+        <tab-content class="tab-content">
+            <!-- todo事项 -->
+            <div class="item-container">
+              <list class='todo-list'>
+                <block for="todoList" class="item-container">
+                 <list-item type="item">
+                    <todo todo="{{$item}}" if="{{$item.type===1}}" index="{{$idx}}" ondelete="delete" ontodone="todone"></todo>
+                  </list-item>
+                </block>            
+              </list>
+            </div>
+            <!-- doing事项 -->
+            <div class="item-container">
+              <list class='todo-list'>
+                <block for="todoList"   class="item-container">
+                 <list-item type="item">
+                    <todo todo="{{$item}}" if="{{$item.type===2}}" index="{{$idx}}" ondelete="delete" ontodone="todone"></todo>
+                  </list-item>
+                </block>            
+              </list>
+            </div>
+            <!--done事项-->
+            <div class="item-container">
+              <list class='todo-list'>
+                <block for="todoList"  class="item-container">
+                 <list-item type="item">
+                    <todo todo="{{$item}}" if="{{$item.type===3}}" index="{{$idx}}" ondelete="delete" ></todo>
+                  </list-item>
+                </block>            
+              </list>
+            </div>
+            <!-- 超时事项 -->
+            <div class="item-container">
+              <list class='todo-list'>
+                <block for="todoList"  class="item-container">
+                 <list-item type="item">
+                    <todo todo="{{$item}}" if="{{$item.type===4}}" index="{{$idx}}" ondelete="delete" ontodone="todone"></todo>
+                  </list-item>
+                </block>            
+              </list>
+            </div>
+        </tab-content>
+      </tabs>
+    </div>
+    <div class="add-btn" onclick="add">
+      <image src="../assets/images/add.png"></image>
+    </div>
+    
+    <text class="todonum" if="{{count(1)!==0}}">{{ count(1) }}</text>
+    <text class="doingnum" if="{{count(2)!==0}}">{{ count(2) }}</text>
+    <text class="donenum" if="{{count(3)!==0}}">{{ count(3) }}</text>
+    <text class="overtimenum" if="{{count(4)!==0}}">{{ count(4) }}</text>
+    </stack>
+  </div>
+</template>
+
+<script>
+import { getTodoList, setTodoList } from '../storage/data.js'
+import router from '@system.router'
+import vibrator from '@system.vibrator'
+import prompt from '@system.prompt'
+
+export default {
+  data() {
+    return {
+      todoList: [],
+      d_num:0,
+    }
+  },
+
+  async onInit() {
+    this.$on('showPage', this.refreshList)
+    const todolist= (await getTodoList())
+    // 更新事件状态，进行事件统计
+    todolist.forEach(function (element, index){
+        let arr1 = element.start.replace(/[:\-\\&' ']/g, ',').split(',')
+        let arr2 = element.end.replace(/[:\-\\&' ']/g, ',').split(',')
+        let start_num =(new Date(arr1[0], arr1[1] - 1, arr1[2], arr1[3], arr1[4], 0, 0)).getTime();
+        let end_num =(new Date(arr2[0], arr2[1] - 1, arr2[2], arr2[3], arr2[4], 0, 0)).getTime();
+        let now_num= (new Date()).getTime();
+        let d_num=end_num-now_num;
+        if(now_num>=start_num&&now_num<=end_num && element.type!=3){//处于doing状态
+            todolist[index].type=2;
+            element.type=2;
+        }
+        if(now_num>end_num && element.type!=3){//超过ddl而且没有完成的话应该是超时状态
+            todolist[index].type=4;
+            element.type=4
+        }
+        // 如果时间差大于0，并且事件还未完成
+        if(d_num>0&&element.type!=3){
+            //调试时用到的日志信息 
+            // prompt.showToast({
+            //         message:d_num+"ddl",
+            //         duration:"1000000",
+            //         // image:"/Common/logo.png",
+            //         gravity: 'center'
+            //     })
+            //每次storage.get之后，就设置一遍定时器，进行震动提醒 
+            setTimeout(function(){
+              // 调用三段长震动
+              vibrator.vibrate({ mode: 'long' })
+              vibrator.vibrate({ mode: 'long' })
+              vibrator.vibrate({ mode: 'long' })
+              // 返回主页
+              router.push({
+                  uri: 'pages/main',
+              })
+              // 弹窗提醒ddl到了
+              prompt.showToast({
+                    message:"待办事项: "+element.title+" 的ddl到了：",
+                    duration:"1000000",
+                    // image:"/Common/logo.png",
+                    gravity: 'center'
+                })
+            },d_num)
+        }
+    })
+    setTodoList(todolist)          
+  },
+
+  add() {
+    router.push({
+      uri: "pages/add/add_todo"
+    })
+  },
+
+  async refreshList() {
+    this.todoList = (await getTodoList()) || []
+  },
+  delete(e) {
+    this.todoList.splice(e.detail.index, 1)
+    setTodoList(this.todoList)
+  },
+  todone(e) {
+    this.todoList[e.detail.index].type=3
+    setTodoList(this.todoList);
+  },
+  count(e){
+    let num=0;  
+    const todolist=  getTodoList()
+    this.todoList.forEach(function (element, index){
+        if(element.type==e){
+          num++;
+        }
+      }
+    )
+    return num;
+  }
+} 
+
+</script>
+
+<style lang="less">
+@import '../assets/styles/style.less';
+
+.content-wrap {
+  padding-bottom: 52px;
+}
+
+.no-result {
+  .flex-box-mixins(column, flex-start, center);
+  image {
+    width: 80px;
+    height: 80px;
+    margin-top: 200px;
+    margin-bottom: 15px;
+  }
+  text {
+    font-size: 13px;
+    color: #e2e2e2;
+  }
+}
+/* 添加按钮样式 */
+.add-btn {
+  .flex-box-mixins;
+  width: 50px;
+  height: 50px;
+  border-radius: 30px;
+  background-color: @brand;
+  position:absolute;
+  bottom: 80px;
+  right: 25px;
+  image {
+    width: 20px;
+    height: 20px;
+  }
+}
+
+
+.main-page {
+  background-color: rgb(238, 235, 235);
+  flex-direction: column;
+  width:360px;
+  margin-bottom: 50px;
+  .title-area{
+    height:40px;
+    width:360px;
+    background-color: #9dd7ef;
+    .title-text{
+      width:100%;
+      text-align: center;
+      font-size: 22;
+      font-family:  fantasy;
+    }
+  }
+  .tabs {
+    /* flex:2; */
+    background-color: rgb(238, 235, 235);
+    margin-left:10px;
+    margin-right: 0;
+    margin-top: 10px;
+    margin-bottom: 0px;
+    .tab-content {
+      flex: 0;
+    }
+    .tab-bar {
+      height: 50px;
+      width: 340px;
+      margin-left: 0px;
+      margin-right: 0px;
+      margin-bottom: 0px;
+      background-color: #ffffff;
+      border: 1px solid rgb(116, 139, 196);
+      border-radius: 20px;
+    }
+    .tab-text {
+      width:100%;
+      text-align: center;
+      padding-left: 0px;
+      padding-right: 0px;
+      font-weight: bold;
+      font-family: myfont-bold, serif;
+      font-size:22px;
+      color: #808080;
+    }
+    .tab-text:active {
+      color: #1294e0;
+      font-weight: bold;
+      font-family: myfont-bold, serif;
+    }
+
+  }
+}
+.tab-content {
+  width: 350px;
+  padding-top: 15px;
+  margin-left: 50px;
+}
+
+/* 三种事件的数量 */
+.todonum{
+  position: absolute;
+  width:14px;
+  height:10px;
+  top: 58px;
+  left: 81px;
+  text-align: center;
+  font-size: 8px;
+  border-radius: 10px;
+  color: #ffffff;
+  background-color: #ff0000;
+  font-family: 'Times New Roman';
+  font-style: italic;
+}
+.doingnum{
+  position: absolute;
+  width:14px;
+  height:10px;
+  top: 58px;
+  left: 172px;
+  text-align: center;
+  font-size: 8px;
+  border-radius: 10px;
+  color: #ffffff;
+  background-color: #ff0000;
+  font-family: 'Times New Roman';
+  font-style: italic;
+}
+.donenum{
+  position: absolute;
+  width:14px;
+  height:10px;
+  top: 58px;
+  left: 251px;
+  text-align: center;
+  font-size: 8px;
+  border-radius: 10px;
+  color:  #000000;
+  background-color: rgb(238, 235, 235);
+  font-family: 'Times New Roman';
+  font-style: italic;
+}
+.overtimenum{
+  position: absolute;
+  width:14px;
+  height:10px;
+  top: 58px;
+  left: 327px;
+  text-align: center;
+  font-size: 8px;
+  border-radius: 10px;
+  color:  #ffffff;
+  background-color: #ff0000;
+  font-family: 'Times New Roman';
+  font-style: italic;
+}
+</style>

@@ -1,0 +1,76 @@
+<template>
+  <div class="bar-wrap">
+    <div class="bar-item" onclick="clickBar('todo_show')">
+      <image
+        src="{{current === 'todo_show' ? '/assets/images/todo-active.png' : '/assets/images/todo.png'}}"
+      ></image>
+      <text style="color: {{current === 'todo_show' ? '#1296db' : '#999999'}};"
+        >待办</text
+      >
+    </div>
+    <div class="bar-item" onclick="clickBar('note_show')">
+      <image
+        src="{{current === 'note_show' ? '/assets/images/note-active.png' : '/assets/images/note.png'}}"
+      ></image>
+      <text style="color: {{current === 'note_show' ? '#1296db' : '#999999'}};"
+        >笔记</text
+      >
+    </div>
+    <div class="bar-item" onclick="clickBar('more')">
+      <image
+        src="{{current === 'more' ? '/assets/images/more-active.png' : '/assets/images/more.png'}}"
+      ></image>
+      <text style="color: {{current === 'more' ? '#1296db' : '#999999'}};"
+        >更多</text
+      >
+    </div>
+
+  </div>
+</template>
+
+<script>
+export default {
+  data() {
+    return {
+      current: 'todo_show'
+    }
+  },
+
+  clickBar(cur) {
+    this.current = cur
+    this.$emitElement('tap', {
+      current: this.current
+    })
+  }
+}
+</script>
+
+<style lang="less">
+@import '../assets/styles/style.less';
+
+.bar-wrap {
+  width: 100%;
+  height: 52px;
+  background-color:rgb(255, 255, 255); 
+  position: fixed;
+  bottom: 0;
+  padding: 0 15px;
+  .border-top;
+}
+
+.bar-item {
+  .flex-box-mixins;
+  width: 50%;
+  image {
+    width: 24px;
+    height: 24px;
+    margin-top: 7px;
+    margin-bottom: 2px;
+  }
+  text {
+    font-size: 10px;
+    text-align: center;
+    line-height: 13px;
+  }
+}
+</style>
